@@ -40,7 +40,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.
 ## Настройка для 3x-ui.
 В первую очередь стоит подключить домен к панели и получить TLS сертификат. Для этого через меню x-ui выбираем соответствующие пункты (SSL Certificate Management или Cloudflare SSL Certificate). Чтобы избежать проблем с обновлением сертификатов, рекомендую подключать через Cloudflare.
 
-Далее создаем инбаунд со следующими настройками:\
+Далее создаем инбаунд со следующими настройками в вебе:\
 Протокол vless\
 Порт 443\
 Транспорт TCP (RAW)\
@@ -53,7 +53,200 @@ SSL сертификат Путь к сертификату\
 \
 В Fallbacks, в поле Dest, указываем 8080\
 \
-Жмем создать
+Жмем создать.
+
+Так же можно попробовать в терминале вместо веба:
+```
+# Задаем переменную с доменом
+export domain=vash-domen
+# Создаем резервную копию
+cp /usr/local/x-ui/bin/config.json /usr/local/x-ui/bin/config.json.backup
+# Создаем полный config.json с роутингом для RU
+cat << EOF > /usr/local/x-ui/bin/config.json
+{
+  "log": {
+    "access": "none",
+    "dnsLog": false,
+    "error": "",
+    "loglevel": "warning",
+    "maskAddress": ""
+  },
+  "routing": {
+    "domainStrategy": "AsIs",
+    "rules": [
+      {
+        "type": "field",
+        "inboundTag": ["api"],
+        "outboundTag": "api"
+      },
+      {
+        "type": "field",
+        "outboundTag": "blocked",
+        "ip": ["geoip:private"]
+      },
+      {
+        "type": "field",
+        "outboundTag": "blocked",
+        "protocol": ["bittorrent"]
+      },
+      {
+        "type": "field",
+        "outboundTag": "direct",
+        "ip": ["ext:geoip_RU.dat:ru"]
+      },
+      {
+        "type": "field",
+        "outboundTag": "direct",
+        "domain": [
+          "ext:geosite_RU.dat:ru-available-only-inside",
+          "regexp:.*\\.ru$",
+          "regexp:.*\\.su$",
+          "regexp:.*\\.xn--p1ai$"
+        ]
+      },
+      {
+        "type": "field",
+        "network": "TCP,UDP",
+        "balancerTag": "Исходящие подключения добавить в балансировщик"
+      }
+    ],
+    "balancers": [
+      {
+        "tag": "Исходящие подключения добавить в балансировщик",
+        "selector": ["direct"],
+        "fallbackTag": ""
+      }
+    ]
+  },
+  "dns": null,
+  "inbounds": [
+    {
+      "listen": "127.0.0.1",
+      "port": 62789,
+      "protocol": "tunnel",
+      "settings": {
+        "address": "127.0.0.1"
+      },
+      "streamSettings": null,
+      "tag": "api",
+      "sniffing": null
+    },
+    {
+      "listen": "0.0.0.0",
+      "port": 443,
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none",
+        "encryption": "none",
+        "fallbacks": [
+          {
+            "alpn": "http/1.1",
+            "dest": "8080",
+            "name": "$domain",
+            "path": "/",
+            "xver": 0
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "tls",
+        "tcpSettings": {
+          "acceptProxyProtocol": false,
+          "header": {
+            "type": "none"
+          }
+        },
+        "tlsSettings": {
+          "alpn": ["http/1.1"],
+          "certificates": [
+            {
+              "buildChain": false,
+              "certificateFile": "/root/cert/$domain/fullchain.pem",
+              "keyFile": "/root/cert/$domain/privkey.pem",
+              "oneTimeLoading": false,
+              "usage": "encipherment"
+            }
+          ],
+          "cipherSuites": "",
+          "disableSystemRoot": false,
+          "echForceQuery": "none",
+          "echServerKeys": "",
+          "enableSessionResumption": false,
+          "maxVersion": "1.3",
+          "minVersion": "1.2",
+          "rejectUnknownSni": false,
+          "serverName": "$domain"
+        }
+      },
+      "tag": "inbound-443",
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls", "quic", "fakedns"],
+        "metadataOnly": false,
+        "routeOnly": true
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "direct",
+      "protocol": "freedom",
+      "settings": {
+        "domainStrategy": "AsIs",
+        "redirect": "",
+        "noises": []
+      }
+    },
+    {
+      "tag": "blocked",
+      "protocol": "blackhole",
+      "settings": {}
+    }
+  ],
+  "transport": null,
+  "policy": {
+    "levels": {
+      "0": {
+        "statsUserDownlink": true,
+        "statsUserUplink": true
+      }
+    },
+    "system": {
+      "statsInboundDownlink": true,
+      "statsInboundUplink": true,
+      "statsOutboundDownlink": true,
+      "statsOutboundUplink": true
+    }
+  },
+  "api": {
+    "tag": "api",
+    "services": ["HandlerService", "LoggerService", "StatsService"]
+  },
+  "stats": {},
+  "reverse": null,
+  "fakedns": null,
+  "observatory": null,
+  "burstObservatory": {
+    "subjectSelector": ["direct"],
+    "pingConfig": {
+      "destination": "https://www.google.com/generate_204",
+      "interval": "30m",
+      "connectivity": "http://connectivitycheck.platform.hicloud.com/generate_204",
+      "timeout": "60s",
+      "sampling": 2
+    }
+  },
+  "metrics": {
+    "tag": "metrics_out",
+    "listen": "127.0.0.1:11111"
+  }
+}
+EOF
+# Перезапускаем панель
+x-ui restart
+``` 
 
 ### Установка Nginx, создание сайта
 
