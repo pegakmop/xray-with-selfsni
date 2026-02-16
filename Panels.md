@@ -59,7 +59,7 @@ SSL сертификат Путь к сертификату\
 
 Создаем инбаунт, получаем сертификаты если не получены и настройка нгинс с скачиванием главной странички
 ``` 
-curl -o /root/vless-tls.sh https://raw.githubusercontent.com/pegakmop/xray-with-selfsni/refs/heads/main/root/vless-tls.sh && chmod +x /root/vless-tls.sh
+curl -o /root/vless-tls.sh https://raw.githubusercontent.com/pegakmop/xray-with-selfsni/refs/heads/main/root/vless-tls.sh && chmod +x /root/vless-tls.sh && ls
 ```
 потом запустить 
 ```
